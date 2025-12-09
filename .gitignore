@@ -37,7 +37,7 @@ Thumbs.db
 .env.local
 
 # Build artifacts
-urlchecker
+bin/
 url-availability-checker
 
 # Logs
