@@ -19,11 +19,11 @@ jobs:
         with:
           go-version: "1.22"
 
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v4
-        with:
-          version: latest
-          args: --timeout=5m
+      - name: Install Task
+        run: curl -sL https://taskfile.dev/install.sh | sh -s -- -b /usr/local/bin
+
+      - name: Run lint
+        run: task lint
 
   test:
     name: Test
@@ -37,11 +37,14 @@ jobs:
         with:
           go-version: "1.22"
 
+      - name: Install Task
+        run: curl -sL https://taskfile.dev/install.sh | sh -s -- -b /usr/local/bin
+
       - name: Download dependencies
-        run: go mod download
+        run: task deps
 
       - name: Run tests
-        run: go test -v -race -coverprofile=coverage.out ./...
+        run: task test
 
       - name: Upload coverage
         uses: codecov/codecov-action@v3
@@ -80,11 +83,17 @@ jobs:
         with:
           go-version: "1.22"
 
+      - name: Install Task
+        run: curl -sL https://taskfile.dev/install.sh | sh -s -- -b /usr/local/bin
+
+      - name: Download dependencies
+        run: task deps
+
       - name: Build
-        run: make build
+        run: task build
 
       - name: Build all platforms
-        run: make build-all
+        run: task build-all
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -100,14 +109,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Install Task
+        run: curl -sL https://taskfile.dev/install.sh | sh -s -- -b /usr/local/bin
 
       - name: Build Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: false
-          tags: urlstatuscecker:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+        run: task docker
