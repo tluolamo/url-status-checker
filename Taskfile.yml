@@ -1,0 +1,203 @@
+version: "3"
+
+vars:
+  BINARY_NAME: urlchecker
+  BUILD_DIR: bin
+  MAIN_PATH: cmd/urlchecker
+
+tasks:
+  help:
+    desc: Show this help message
+    cmds:
+      - task -l
+
+  deps:
+    desc: Download dependencies
+    cmds:
+      - go mod download
+      - go mod tidy
+
+  build:
+    desc: Build the application
+    cmds:
+      - mkdir -p bin
+      - go build -ldflags "-s -w" -o bin/urlchecker ./cmd/urlchecker
+
+  build-all:
+    desc: Build for all platforms
+    cmds:
+      - mkdir -p bin
+      - GOOS=linux GOARCH=amd64 go build -ldflags "-s -w" -o bin/urlchecker-linux-amd64 ./cmd/urlchecker
+      - GOOS=linux GOARCH=arm64 go build -ldflags "-s -w" -o bin/urlchecker-linux-arm64 ./cmd/urlchecker
+      - GOOS=darwin GOARCH=amd64 go build -ldflags "-s -w" -o bin/urlchecker-darwin-amd64 ./cmd/urlchecker
+      - GOOS=darwin GOARCH=arm64 go build -ldflags "-s -w" -o bin/urlchecker-darwin-arm64 ./cmd/urlchecker
+      - GOOS=windows GOARCH=amd64 go build -ldflags "-s -w" -o bin/urlchecker-windows-amd64.exe ./cmd/urlchecker
+
+  run:
+    desc: Build and run the application
+    deps:
+      - build
+    cmds:
+      - ./bin/urlchecker serve
+
+  dev:
+    desc: Run with live reload (requires air)
+    cmds:
+      - sh -c 'which air > /dev/null || (echo "Installing air..." && go install github.com/air-verse/air@latest)'
+      - sh -c '$(go env GOPATH)/bin/air'
+
+  test:
+    desc: Run tests
+    cmds:
+      - go test -v -race -coverprofile=coverage.out ./...
+
+  test-race:
+    desc: Run tests with race detector
+    cmds:
+      - go test -race -short ./...
+
+  coverage:
+    desc: Generate coverage report
+    deps:
+      - test
+    cmds:
+      - go tool cover -html=coverage.out -o coverage.html
+
+  bench:
+    desc: Run benchmarks
+    cmds:
+      - go test -bench=. -benchmem ./...
+
+  lint:
+    desc: Run linters
+    cmds:
+      - sh -c 'which golangci-lint > /dev/null || (echo "Installing golangci-lint..." && go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest)'
+      - sh -c '$(go env GOPATH)/bin/golangci-lint run --timeout 5m'
+
+  fmt:
+    desc: Format code
+    cmds:
+      - go fmt ./...
+      - sh -c 'which goimports > /dev/null || go install golang.org/x/tools/cmd/goimports@latest'
+      - goimports -w .
+
+  vet:
+    desc: Run go vet
+    cmds:
+      - go vet ./...
+
+  security:
+    desc: Run security scan
+    cmds:
+      - sh -c 'which gosec > /dev/null || (echo "Installing gosec..." && go install github.com/securego/gosec/v2/cmd/gosec@latest)'
+      - gosec ./...
+
+  docker:
+    desc: Build Docker image
+    cmds:
+      - docker build -t urlchecker:latest .
+
+  docker-run:
+    desc: Run Docker image locally (builds first)
+    deps:
+      - docker
+    cmds:
+      - docker run --rm -p 8080:8080 urlchecker:latest
+
+  docker-compose-up:
+    desc: Start services with docker-compose
+    cmds:
+      - docker-compose up -d
+
+  docker-compose-down:
+    desc: Stop services with docker-compose
+    cmds:
+      - docker-compose down
+
+  kind-create:
+    desc: Create kind cluster for local K8s testing
+    cmds:
+      - kind create cluster --config deployments/kubernetes/kind-config.yaml
+
+  kind-load:
+    desc: Load Docker image into kind cluster
+    deps:
+      - docker
+    cmds:
+      - kind load docker-image urlchecker:latest --name urlchecker-demo
+
+  k8s-deploy:
+    desc: Deploy to Kubernetes
+    cmds:
+      - kubectl apply -f deployments/kubernetes/namespace.yaml
+      - kubectl apply -f deployments/kubernetes/configmap.yaml
+      - kubectl apply -f deployments/kubernetes/deployment.yaml
+      - kubectl apply -f deployments/kubernetes/service.yaml
+      - kubectl apply -f deployments/kubernetes/prometheus-deployment.yaml
+
+  k8s-delete:
+    desc: Delete Kubernetes deployment
+    cmds:
+      - kubectl delete -f deployments/kubernetes/prometheus-deployment.yaml --ignore-not-found=true
+      - kubectl delete -f deployments/kubernetes/service.yaml --ignore-not-found=true
+      - kubectl delete -f deployments/kubernetes/deployment.yaml --ignore-not-found=true
+      - kubectl delete -f deployments/kubernetes/configmap.yaml --ignore-not-found=true
+      - kubectl delete -f deployments/kubernetes/namespace.yaml --ignore-not-found=true
+
+  k8s-logs:
+    desc: View application logs in Kubernetes
+    cmds:
+      - kubectl logs -n url-checker -l app=urlchecker -f
+
+  k8s-status:
+    desc: Check Kubernetes deployment status
+    cmds:
+      - kubectl get all -n url-checker
+
+  kind-delete:
+    desc: Delete kind cluster
+    cmds:
+      - kind delete cluster --name urlchecker-demo
+
+  kind-demo:
+    desc: Full kind demo setup (create cluster, load image, deploy)
+    cmds:
+      - task kind-create
+      - task kind-load
+      - task k8s-deploy
+      - echo "Demo cluster ready! Access at http://localhost:8080"
+      - echo "Prometheus at http://localhost:9090"
+
+  clean:
+    desc: Stop local stacks and clean artifacts
+    cmds:
+      - task docker-compose-down || true
+      - task k8s-delete || true
+      - task kind-delete || true
+      - rm -rf bin
+      - rm -f coverage.out coverage.html
+      - go clean
+
+  install:
+    desc: Install binary to $GOPATH/bin
+    deps:
+      - build
+    cmds:
+      - mkdir -p $(go env GOPATH)/bin
+      - cp bin/urlchecker $(go env GOPATH)/bin/urlchecker
+
+  ci:
+    desc: Run CI pipeline (lint + test)
+    deps:
+      - deps
+      - lint
+      - test
+
+  all:
+    desc: Run all build steps
+    deps:
+      - clean
+      - deps
+      - lint
+      - test
+      - build

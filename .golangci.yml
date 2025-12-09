@@ -1,0 +1,90 @@
+# golangci-lint configuration
+# https://golangci-lint.run/usage/configuration/
+
+run:
+  timeout: 5m
+  tests: true
+  modules-download-mode: readonly
+
+linters:
+  enable:
+    - errcheck # Check for unchecked errors
+    - gosimple # Simplify code
+    - govet # Reports suspicious constructs
+    - ineffassign # Detect ineffectual assignments
+    - staticcheck # Staticcheck is a go vet on steroids
+    - typecheck # Type-checks Go code
+    - unused # Check for unused constants, variables, functions
+    - gofmt # Check code is formatted
+    - goimports # Check imports are formatted
+    - misspell # Check for misspelled words
+    - revive # Fast, configurable, extensible, flexible, and beautiful linter
+    - gosec # Security-focused linter
+    - unconvert # Remove unnecessary type conversions
+    - gocyclo # Computes cyclomatic complexity
+    - goconst # Find repeated strings that could be constants
+    - gocritic # Provides diagnostics that check for bugs, performance and style issues
+    - nolintlint # Reports ill-formed or insufficient nolint directives
+    - exhaustive # Check exhaustiveness of enum switch statements
+    - errorlint # Find code that will cause problems with error wrapping
+    - bodyclose # Check whether HTTP response body is closed
+    - contextcheck # Check whether the function uses a non-inherited context
+    - nilerr # Find code that returns nil even if it checks that error is not nil
+
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+
+  gocyclo:
+    min-complexity: 15
+
+  goconst:
+    min-len: 3
+    min-occurrences: 3
+
+  misspell:
+    locale: US
+
+  revive:
+    rules:
+      - name: exported
+        disabled: false
+      - name: unexported-return
+        disabled: false
+      - name: var-naming
+        disabled: false
+      - name: error-strings
+        disabled: false
+      - name: error-naming
+        disabled: false
+      - name: indent-error-flow
+        disabled: false
+      - name: blank-imports
+        disabled: false
+
+  gosec:
+    excludes:
+      - G404 # Use of weak random number generator (math/rand instead of crypto/rand) - OK for non-security use
+
+  staticcheck:
+    checks: ["all"]
+
+issues:
+  uniq-by-line: false
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+  exclude-rules:
+    # Exclude some linters from running on tests files
+    - path: _test\.go
+      linters:
+        - gocyclo
+        - errcheck
+        - gosec
+        - goconst
+
+    # Exclude known issues in vendored code
+    - path: vendor/
+      linters:
+        - all
